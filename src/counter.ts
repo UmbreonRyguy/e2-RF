@@ -31,14 +31,15 @@ const diagnostic = document.querySelector<HTMLParagraphElement>(
 const shieldEvents = new EventTarget();
 let snapshot: ShieldSnapshot = makeSnapshot(0, CAPACITY);
 let panel: HTMLParagraphElement | null = null;
+let unsubscribeInspector: (() => void) | null = null;
 let panelUpdates = 0;
 
 //function to listen for shield change events
-function onShieldChange(handler: (s: ShieldSnapshot) => void): void {
-  shieldEvents.addEventListener(
-    SHIELD_CHANGED,
-    (e) => handler((e as CustomEvent<ShieldSnapshot>).detail),
-  );
+function onShieldChange(handler: (s: ShieldSnapshot) => void): () => void {
+  const listener = (e: Event): void =>
+    handler((e as CustomEvent<ShieldSnapshot>).detail);
+  shieldEvents.addEventListener(SHIELD_CHANGED, listener);
+  return () => shieldEvents.removeEventListener(SHIELD_CHANGED, listener);
 }
 
 //function to render the stats in the panel
@@ -58,8 +59,8 @@ function renderStats(s: ShieldSnapshot): void {
   panel.textContent =
     `Shield charge: ${s.charge} · Missing charge: ${s.missing}`;
 }
-
-function deliverToPanel(s: ShieldSnapshot): void {
+//function to handle inspector deliveries
+function onInspectorDelivery(s: ShieldSnapshot): void {
   panelUpdates++;
   diagnostic.textContent = `Inspector deliveries: ${panelUpdates}`;
   renderStats(s);
@@ -72,10 +73,26 @@ function setCount(next: number): void {
   shieldEvents.dispatchEvent(
     new CustomEvent<ShieldSnapshot>(SHIELD_CHANGED, { detail: snapshot }),
   );
-  if (panel) deliverToPanel(snapshot); // inspector keeps its direct path
+}
+//function to open the inspector panel
+function openInspector(): void {
+  if (panel) return;
+  panel = document.createElement("p");
+  host.append(panel);
+  renderStats(snapshot); // initial render, not a delivery
+  unsubscribeInspector = onShieldChange(onInspectorDelivery);
+}
+//function to close the inspector panel
+function closeInspector(): void {
+  if (!panel) return;
+  unsubscribeInspector?.();
+  unsubscribeInspector = null;
+  panel.remove();
+  panel = null;
 }
 
 onShieldChange(drawMeter);
+
 
 document.querySelector<HTMLButtonElement>("#counter-less")!.onclick = () => {
   setCount(snapshot.charge - 1);
@@ -86,15 +103,8 @@ document.querySelector<HTMLButtonElement>("#counter-more")!.onclick = () => {
 document.querySelector<HTMLButtonElement>("#counter-reset")!.onclick = () => {
   setCount(0);
 };
-document.querySelector<HTMLButtonElement>("#counter-open")!.onclick = () => {
-  if (panel) return;
-  panel = document.createElement("p");
-  host.append(panel);
-  renderStats(snapshot);
-};
-document.querySelector<HTMLButtonElement>("#counter-close")!.onclick = () => {
-  if (!panel) return;
-  panel.remove();
-  panel = null;
-};
-drawMeter(snapshot);
+document.querySelector<HTMLButtonElement>("#counter-open")!.onclick =
+  openInspector;
+document.querySelector<HTMLButtonElement>("#counter-close")!.onclick =
+  closeInspector;
+drawMeter(snapshot); 
