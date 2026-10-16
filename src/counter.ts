@@ -9,12 +9,14 @@ interface ShieldSnapshot {
 
 const CAPACITY = 10;
 
+//create a constant for shield change event
+const SHIELD_CHANGED = "shieldchange";
+
 //function to make a shield snapshot
 function makeSnapshot(charge: number, capacity: number): ShieldSnapshot {
   const bounded = Math.max(0, Math.min(capacity, charge));
   return { charge: bounded, capacity, missing: capacity - bounded };
 }
-
 
 const canvas = document.querySelector<HTMLCanvasElement>("#counter-canvas")!;
 const ctx = canvas.getContext("2d")!;
@@ -25,10 +27,19 @@ const host = document.querySelector<HTMLDivElement>("#counter-panel-host")!;
 const diagnostic = document.querySelector<HTMLParagraphElement>(
   "#counter-diagnostic",
 )!;
-
+//event target for shield events
+const shieldEvents = new EventTarget();
 let snapshot: ShieldSnapshot = makeSnapshot(0, CAPACITY);
 let panel: HTMLParagraphElement | null = null;
 let panelUpdates = 0;
+
+//function to listen for shield change events
+function onShieldChange(handler: (s: ShieldSnapshot) => void): void {
+  shieldEvents.addEventListener(
+    SHIELD_CHANGED,
+    (e) => handler((e as CustomEvent<ShieldSnapshot>).detail),
+  );
+}
 
 //function to render the stats in the panel
 function drawMeter(s: ShieldSnapshot): void {
@@ -44,7 +55,8 @@ function drawMeter(s: ShieldSnapshot): void {
 }
 function renderStats(s: ShieldSnapshot): void {
   if (!panel) return;
-  panel.textContent = `Shield charge: ${s.charge} · Missing charge: ${s.missing}`;
+  panel.textContent =
+    `Shield charge: ${s.charge} · Missing charge: ${s.missing}`;
 }
 
 function deliverToPanel(s: ShieldSnapshot): void {
@@ -57,10 +69,13 @@ function setCount(next: number): void {
   const nextSnapshot = makeSnapshot(next, CAPACITY);
   if (nextSnapshot.charge === snapshot.charge) return;
   snapshot = nextSnapshot;
-  drawMeter(snapshot);
-  if (panel) deliverToPanel(snapshot);
+  shieldEvents.dispatchEvent(
+    new CustomEvent<ShieldSnapshot>(SHIELD_CHANGED, { detail: snapshot }),
+  );
+  if (panel) deliverToPanel(snapshot); // inspector keeps its direct path
 }
 
+onShieldChange(drawMeter);
 
 document.querySelector<HTMLButtonElement>("#counter-less")!.onclick = () => {
   setCount(snapshot.charge - 1);
