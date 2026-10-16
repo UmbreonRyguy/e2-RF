@@ -4,6 +4,10 @@ const canvas = document.querySelector<HTMLCanvasElement>("#rover-canvas")!;
 const ctx = canvas.getContext("2d")!;
 const readout = document.querySelector<HTMLParagraphElement>("#rover-readout")!;
 
+const queueList = document.querySelector<HTMLOListElement>("#rover-queue")!;
+const runButton = document.querySelector<HTMLButtonElement>("#rover-run")!;
+const clearButton = document.querySelector<HTMLButtonElement>("#rover-clear")!;
+
 //Create a type for the direction of the rover
 type Direction = {
   name: string;
@@ -26,10 +30,12 @@ let direction = 0;
 
 //create the command type
 type Command = {
+  label: string;
   execute(): void;
 };
 //create the forward command class
 class ForwardCommand implements Command {
+  label = "Forward";
   execute() {
     //command uses direction array
     const { dx, dy } = directions[direction];
@@ -39,10 +45,13 @@ class ForwardCommand implements Command {
 }
 //create the right command class
 class RightCommand implements Command {
+  label = "Right";
   execute() {
     direction = (direction + 1) % directions.length;
   }
 }
+
+const queue: Command[] = [];
 
 function drawRover() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -67,24 +76,55 @@ function drawRover() {
     directions[direction].name
   }`;
 }
-//run the command and draw the rover
-function run(command: Command) {
-  command.execute();
+
+//Function to render the queue of commands
+function renderQueue() {
+  const items = queue.map((command) => {
+    const item = document.createElement("li");
+    item.textContent = command.label;
+    return item;
+  });
+  queueList.replaceChildren(...items);
+  runButton.disabled = queue.length === 0;
+  clearButton.disabled = queue.length === 0;
+}
+
+function enqueue(command: Command) {
+  queue.push(command);
+  renderQueue();
+}
+
+//Function to run the queue of commands
+function runQueue() {
+  while (queue.length > 0) {
+    queue.shift()!.execute();
+  }
+  renderQueue();
   drawRover();
 }
-//bind the buttons to the commands
-function bind(selector: string, command: Command) {
-  document.querySelector<HTMLButtonElement>(selector)!.onclick = () =>
-    run(command);
-}
-//bind the buttons to the commands
-bind("#rover-forward", new ForwardCommand());
-bind("#rover-right", new RightCommand());
 
-document.querySelector<HTMLButtonElement>("#rover-reset")!.onclick = () => {
+function clearQueue() {
+  queue.length = 0;
+  renderQueue();
+}
+
+function reset() {
   x = 2;
   y = 2;
   direction = 0;
+  clearQueue();
   drawRover();
-};
+}
+
+function bind(selector: string, handler: () => void) {
+  document.querySelector<HTMLButtonElement>(selector)!.onclick = handler;
+}
+//bind buttons to their commands
+bind("#rover-forward", () => enqueue(new ForwardCommand()));
+bind("#rover-right", () => enqueue(new RightCommand()));
+bind("#rover-run", runQueue);
+bind("#rover-clear", clearQueue);
+bind("#rover-reset", reset);
+
+renderQueue();
 drawRover();
