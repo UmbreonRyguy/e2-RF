@@ -8,6 +8,27 @@ let x = 2;
 let y = 2;
 let direction = 0;
 
+//create the command type
+type Command = {
+  execute(): void;
+};
+//create the forward command class
+class ForwardCommand implements Command {
+  execute() {
+    if (direction === 0) y = Math.max(0, y - 1);
+    if (direction === 1) x = Math.min(4, x + 1);
+    if (direction === 2) y = Math.min(4, y + 1);
+    if (direction === 3) x = Math.max(0, x - 1);
+  }
+}
+//create the right command class
+class RightCommand implements Command {
+  execute() {
+    direction = (direction + 1) % 4;
+  }
+}
+
+
 function drawRover() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.strokeStyle = "#718881";
@@ -31,18 +52,21 @@ function drawRover() {
     headings[direction]
   }`;
 }
+//run the command and draw the rover
+function run(command: Command) {
+  command.execute();
+  drawRover();
+}
+//bind the buttons to the commands
+function bind(selector: string, command: Command) {
+  document.querySelector<HTMLButtonElement>(selector)!.onclick = () =>
+    run(command);
+}
+//bind the buttons to the commands
+bind("#rover-forward", new ForwardCommand());
+bind("#rover-right", new RightCommand());
 
-document.querySelector<HTMLButtonElement>("#rover-forward")!.onclick = () => {
-  if (direction === 0) y = Math.max(0, y - 1);
-  if (direction === 1) x = Math.min(4, x + 1);
-  if (direction === 2) y = Math.min(4, y + 1);
-  if (direction === 3) x = Math.max(0, x - 1);
-  drawRover();
-};
-document.querySelector<HTMLButtonElement>("#rover-right")!.onclick = () => {
-  direction = (direction + 1) % 4;
-  drawRover();
-};
+
 document.querySelector<HTMLButtonElement>("#rover-reset")!.onclick = () => {
   x = 2;
   y = 2;
